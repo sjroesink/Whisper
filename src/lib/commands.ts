@@ -14,10 +14,12 @@ async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Prom
   return invoke<T>(cmd, args);
 }
 
+export const DEFAULT_HOTKEY = "CommandOrControl+Shift+Space";
+
 const defaultSettings: AppSettings = {
   active_provider: "OpenAiWhisper",
   interaction_mode: "Toggle",
-  hotkey: "CommandOrControl+Shift+Space",
+  hotkey: DEFAULT_HOTKEY,
   language: "auto",
   provider_configs: {},
   local_whisper_model_path: null,

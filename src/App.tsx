@@ -1,10 +1,18 @@
 import { useEffect } from "react";
 import { useAppStore } from "./stores/useAppStore";
 import { setupEventListeners } from "./lib/events";
-import { getSettings, getHistory, getProviders } from "./lib/commands";
+import {
+  DEFAULT_HOTKEY,
+  getSettings,
+  getHistory,
+  getProviders,
+  startRecording,
+  stopRecordingAndTranscribe,
+} from "./lib/commands";
 import { RecordingIndicator } from "./components/recording/RecordingIndicator";
 import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { HistoryList } from "./components/history/HistoryList";
+import { HotkeyDisplay } from "./components/HotkeyDisplay";
 
 function App() {
   const setRecording = useAppStore((s) => s.setRecording);
@@ -17,8 +25,24 @@ function App() {
   const addHistory = useAppStore((s) => s.addHistory);
   const activeView = useAppStore((s) => s.activeView);
   const setActiveView = useAppStore((s) => s.setActiveView);
+  const isRecording = useAppStore((s) => s.isRecording);
+  const isTranscribing = useAppStore((s) => s.isTranscribing);
   const error = useAppStore((s) => s.error);
   const currentTranscription = useAppStore((s) => s.currentTranscription);
+  const settings = useAppStore((s) => s.settings);
+
+  const handleMicClick = async () => {
+    if (isTranscribing) return;
+    try {
+      if (isRecording) {
+        await stopRecordingAndTranscribe();
+      } else {
+        await startRecording();
+      }
+    } catch (e) {
+      console.error("Recording toggle failed:", e);
+    }
+  };
 
   // Initialize app
   useEffect(() => {
@@ -90,31 +114,72 @@ function App() {
       <main className="flex-1 overflow-hidden">
         {activeView === "home" && (
           <div className="flex flex-col items-center justify-center h-full gap-6 px-6">
-            {/* Status */}
+            {/* Mic Button */}
             <div className="flex flex-col items-center gap-4">
-              <div className="w-24 h-24 rounded-full bg-zinc-800 flex items-center justify-center">
-                <svg
-                  className="w-10 h-10 text-zinc-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
-                  />
-                </svg>
-              </div>
+              <button
+                onClick={handleMicClick}
+                disabled={isTranscribing}
+                className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-200 ${
+                  isRecording
+                    ? "bg-red-500/20 ring-2 ring-red-500 hover:bg-red-500/30"
+                    : isTranscribing
+                      ? "bg-zinc-800 cursor-wait"
+                      : "bg-zinc-800 hover:bg-zinc-700 active:scale-95 cursor-pointer"
+                }`}
+              >
+                {isRecording && (
+                  <span className="absolute inset-0 rounded-full animate-ping bg-red-500/20" />
+                )}
+                {isTranscribing ? (
+                  <svg
+                    className="animate-spin w-10 h-10 text-blue-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className={`w-10 h-10 ${isRecording ? "text-red-500" : "text-zinc-400"}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+                    />
+                  </svg>
+                )}
+              </button>
 
-              <div className="text-center">
+              <div className="flex flex-col items-center gap-2">
                 <p className="text-sm text-zinc-400">
-                  Press your hotkey to start recording
+                  {isRecording
+                    ? "Recording... click to stop"
+                    : isTranscribing
+                      ? "Transcribing..."
+                      : "Click or press hotkey to record"}
                 </p>
-                <p className="text-xs text-zinc-600 mt-1">
-                  Default: Ctrl+Shift+Space
-                </p>
+                {!isRecording && !isTranscribing && (
+                  <HotkeyDisplay
+                    hotkey={settings?.hotkey || DEFAULT_HOTKEY}
+                  />
+                )}
               </div>
             </div>
 
