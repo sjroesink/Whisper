@@ -1,5 +1,6 @@
 import type {
   AppSettings,
+  AudioDevice,
   ProviderInfo,
   TranscriptionEntry,
 } from "../types";
@@ -21,6 +22,7 @@ const defaultSettings: AppSettings = {
   local_whisper_model_path: null,
   auto_paste: true,
   show_overlay: true,
+  input_device: null,
 };
 
 const defaultProviders: ProviderInfo[] = [
@@ -60,4 +62,8 @@ export async function clearHistory(): Promise<void> {
 
 export async function getProviders(): Promise<ProviderInfo[]> {
   return tauriInvoke<ProviderInfo[]>("get_providers").catch(() => defaultProviders);
+}
+
+export async function listInputDevices(): Promise<AudioDevice[]> {
+  return tauriInvoke<AudioDevice[]>("list_input_devices").catch(() => []);
 }

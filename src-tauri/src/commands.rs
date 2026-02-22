@@ -1,9 +1,15 @@
 use tauri::{AppHandle, Emitter, State};
 
+use crate::audio::AudioDevice;
 use crate::history::TranscriptionEntry;
 use crate::providers::ProviderInfo;
 use crate::settings::AppSettings;
 use crate::state::AppState;
+
+#[tauri::command]
+pub fn list_input_devices() -> Result<Vec<AudioDevice>, String> {
+    Ok(crate::audio::list_input_devices())
+}
 
 #[tauri::command]
 pub async fn start_recording(
@@ -11,8 +17,12 @@ pub async fn start_recording(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     {
+        let device_name = {
+            let settings = state.settings.lock().map_err(|e| e.to_string())?;
+            settings.input_device.clone()
+        };
         let mut recorder = state.recorder.lock().map_err(|e| e.to_string())?;
-        recorder.start().map_err(|e| e.to_string())?;
+        recorder.start(&device_name).map_err(|e| e.to_string())?;
     }
     *state.is_recording.lock().unwrap() = true;
     let _ = app.emit("recording-started", ());

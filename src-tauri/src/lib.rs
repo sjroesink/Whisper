@@ -88,6 +88,7 @@ pub fn run() {
             commands::get_history,
             commands::clear_history,
             commands::get_providers,
+            commands::list_input_devices,
         ])
         .run(tauri::generate_context!())
         .expect("error running whisper application");
@@ -95,8 +96,12 @@ pub fn run() {
 
 fn handle_start_recording(app: &tauri::AppHandle) {
     let state = app.state::<AppState>();
+    let device_name = {
+        let settings = state.settings.lock().unwrap();
+        settings.input_device.clone()
+    };
     let mut recorder = state.recorder.lock().unwrap();
-    if let Err(e) = recorder.start() {
+    if let Err(e) = recorder.start(&device_name) {
         log::error!("Failed to start recording: {}", e);
         let _ = app.emit("error", format!("Failed to start recording: {}", e));
         return;
