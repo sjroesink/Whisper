@@ -8,5 +8,5 @@
       "port": 1420
     }
   ],
-  "autoVerify": true
+  "autoVerify": false
 }

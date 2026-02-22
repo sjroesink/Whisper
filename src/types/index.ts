@@ -22,6 +22,12 @@ export interface AppSettings {
   local_whisper_model_path: string | null;
   auto_paste: boolean;
   show_overlay: boolean;
+  input_device: string | null;
+}
+
+export interface AudioDevice {
+  name: string;
+  is_default: boolean;
 }
 
 export interface TranscriptionResult {

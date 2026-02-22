@@ -3,7 +3,52 @@ pub mod resampler;
 use anyhow::{anyhow, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Stream;
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioDevice {
+    pub name: String,
+    pub is_default: bool,
+}
+
+/// List all available audio input devices.
+pub fn list_input_devices() -> Vec<AudioDevice> {
+    let host = cpal::default_host();
+    let default_name = host
+        .default_input_device()
+        .and_then(|d| d.name().ok());
+
+    let mut devices = Vec::new();
+    if let Ok(input_devices) = host.input_devices() {
+        for device in input_devices {
+            if let Ok(name) = device.name() {
+                let is_default = default_name.as_deref() == Some(&name);
+                devices.push(AudioDevice { name, is_default });
+            }
+        }
+    }
+    devices
+}
+
+/// Find an input device by name, falling back to the default device.
+fn find_device(device_name: &Option<String>) -> Result<cpal::Device> {
+    let host = cpal::default_host();
+
+    if let Some(name) = device_name {
+        if let Ok(input_devices) = host.input_devices() {
+            for device in input_devices {
+                if device.name().ok().as_deref() == Some(name.as_str()) {
+                    return Ok(device);
+                }
+            }
+        }
+        log::warn!("Input device '{}' not found, falling back to default", name);
+    }
+
+    host.default_input_device()
+        .ok_or_else(|| anyhow!("No input device found"))
+}
 
 pub struct AudioRecorder {
     stream: Option<Stream>,
@@ -34,11 +79,8 @@ impl AudioRecorder {
         }
     }
 
-    pub fn start(&mut self) -> Result<()> {
-        let host = cpal::default_host();
-        let device = host
-            .default_input_device()
-            .ok_or_else(|| anyhow!("No input device found"))?;
+    pub fn start(&mut self, device_name: &Option<String>) -> Result<()> {
+        let device = find_device(device_name)?;
 
         let config = device.default_input_config()?;
         self.sample_rate = config.sample_rate().0;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAppStore } from "../../stores/useAppStore";
-import { getProviders, saveSettings } from "../../lib/commands";
-import type { AppSettings, ProviderId } from "../../types";
+import { getProviders, listInputDevices, saveSettings } from "../../lib/commands";
+import type { AppSettings, AudioDevice, ProviderId } from "../../types";
 
 export function SettingsPanel() {
   const settings = useAppStore((s) => s.settings);
@@ -12,6 +12,7 @@ export function SettingsPanel() {
   const [localSettings, setLocalSettings] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [inputDevices, setInputDevices] = useState<AudioDevice[]>([]);
 
   useEffect(() => {
     if (settings) {
@@ -21,6 +22,7 @@ export function SettingsPanel() {
 
   useEffect(() => {
     getProviders().then(setProviders);
+    listInputDevices().then(setInputDevices);
   }, []);
 
   if (!localSettings) return null;
@@ -84,6 +86,27 @@ export function SettingsPanel() {
           {providers.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name} {!p.available && "(unavailable)"}
+            </option>
+          ))}
+        </select>
+      </section>
+
+      {/* Input Device */}
+      <section className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-zinc-400">
+          Input Device
+        </label>
+        <select
+          value={localSettings.input_device || ""}
+          onChange={(e) =>
+            updateField("input_device", e.target.value || null)
+          }
+          className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">System Default</option>
+          {inputDevices.map((d) => (
+            <option key={d.name} value={d.name}>
+              {d.name}{d.is_default ? " (default)" : ""}
             </option>
           ))}
         </select>

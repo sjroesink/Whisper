@@ -22,6 +22,8 @@ pub struct AppSettings {
     pub local_whisper_model_path: Option<String>,
     pub auto_paste: bool,
     pub show_overlay: bool,
+    #[serde(default)]
+    pub input_device: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -35,6 +37,7 @@ impl Default for AppSettings {
             local_whisper_model_path: None,
             auto_paste: true,
             show_overlay: true,
+            input_device: None,
         }
     }
 }
