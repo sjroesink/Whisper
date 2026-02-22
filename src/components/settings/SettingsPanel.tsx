@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../../stores/useAppStore";
-import { getProviders, listInputDevices, saveSettings } from "../../lib/commands";
+import { DEFAULT_HOTKEY, getProviders, listInputDevices, saveSettings } from "../../lib/commands";
+import { HotkeyDisplay } from "../HotkeyDisplay";
 import type { AppSettings, AudioDevice, ProviderId } from "../../types";
 
 export function SettingsPanel() {
@@ -12,6 +13,8 @@ export function SettingsPanel() {
   const [localSettings, setLocalSettings] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [isRecordingHotkey, setIsRecordingHotkey] = useState(false);
+  const hotkeyRef = useRef<HTMLDivElement>(null);
   const [inputDevices, setInputDevices] = useState<AudioDevice[]>([]);
 
   useEffect(() => {
@@ -62,6 +65,59 @@ export function SettingsPanel() {
       console.error("Failed to save settings:", e);
     }
     setSaving(false);
+  };
+
+  const handleHotkeyKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Escape: cancel and blur without changes
+    if (e.key === "Escape") {
+      setIsRecordingHotkey(false);
+      hotkeyRef.current?.blur();
+      return;
+    }
+
+    // Backspace/Delete: reset to default
+    if (e.key === "Backspace" || e.key === "Delete") {
+      updateField("hotkey", DEFAULT_HOTKEY);
+      setIsRecordingHotkey(false);
+      hotkeyRef.current?.blur();
+      return;
+    }
+
+    // Ignore standalone modifier keys
+    if (
+      ["Control", "Alt", "Shift", "Meta", "Command"].includes(e.key)
+    ) {
+      return;
+    }
+
+    // Build the hotkey string
+    const parts: string[] = [];
+
+    if (e.ctrlKey || e.metaKey) {
+      parts.push("CommandOrControl");
+    }
+    if (e.altKey) {
+      parts.push("Alt");
+    }
+    if (e.shiftKey) {
+      parts.push("Shift");
+    }
+
+    let key = e.key;
+    if (key === " ") {
+      key = "Space";
+    } else if (key.length === 1) {
+      key = key.toUpperCase();
+    }
+
+    parts.push(key);
+
+    updateField("hotkey", parts.join("+"));
+    setIsRecordingHotkey(false);
+    hotkeyRef.current?.blur();
   };
 
   const activeProviderConfig =
@@ -191,15 +247,28 @@ export function SettingsPanel() {
       {/* Hotkey */}
       <section className="flex flex-col gap-2">
         <label className="text-sm font-medium text-zinc-400">Hotkey</label>
-        <input
-          type="text"
-          value={localSettings.hotkey}
-          onChange={(e) => updateField("hotkey", e.target.value)}
-          placeholder="CommandOrControl+Shift+Space"
-          className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <div
+          ref={hotkeyRef}
+          tabIndex={0}
+          onFocus={() => setIsRecordingHotkey(true)}
+          onBlur={() => setIsRecordingHotkey(false)}
+          onKeyDown={handleHotkeyKeyDown}
+          className={`flex items-center h-10 bg-zinc-800 border rounded-lg px-3 cursor-pointer transition-colors ${
+            isRecordingHotkey
+              ? "border-blue-500 ring-2 ring-blue-500/30"
+              : "border-zinc-700 hover:border-zinc-600"
+          }`}
+        >
+          {isRecordingHotkey ? (
+            <span className="text-sm text-zinc-400 animate-pulse">
+              Press a key combination...
+            </span>
+          ) : (
+            <HotkeyDisplay hotkey={localSettings.hotkey} size="sm" />
+          )}
+        </div>
         <p className="text-xs text-zinc-500">
-          Example: CommandOrControl+Shift+Space
+          Click to record a shortcut. Backspace to reset. Escape to cancel.
         </p>
       </section>
 
