@@ -20,6 +20,12 @@ pub struct AppSettings {
     pub language: String,
     pub provider_configs: HashMap<ProviderId, ProviderConfig>,
     pub local_whisper_model_path: Option<String>,
+    #[serde(default)]
+    pub constme_whisper_dll_path: Option<String>,
+    #[serde(default)]
+    pub constme_whisper_model_path: Option<String>,
+    #[serde(default)]
+    pub constme_whisper_model_name: Option<String>,
     pub auto_paste: bool,
     pub show_overlay: bool,
     #[serde(default)]
@@ -35,6 +41,9 @@ impl Default for AppSettings {
             language: "auto".into(),
             provider_configs: HashMap::new(),
             local_whisper_model_path: None,
+            constme_whisper_dll_path: None,
+            constme_whisper_model_path: None,
+            constme_whisper_model_name: None,
             auto_paste: true,
             show_overlay: true,
             input_device: None,

@@ -1,7 +1,9 @@
+use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::audio::AudioDevice;
 use crate::history::TranscriptionEntry;
+use crate::providers::constme_whisper::download;
 use crate::providers::ProviderInfo;
 use crate::settings::AppSettings;
 use crate::state::AppState;
@@ -138,4 +140,76 @@ pub fn clear_history(state: State<'_, AppState>) -> Result<(), String> {
 #[tauri::command]
 pub fn get_providers(state: State<'_, AppState>) -> Result<Vec<ProviderInfo>, String> {
     Ok(state.provider_manager.lock().unwrap().list_providers())
+}
+
+// --- Const-me/Whisper download commands ---
+
+#[derive(Serialize)]
+pub struct ConstmeWhisperStatus {
+    pub dll_available: bool,
+    pub dll_path: Option<String>,
+    pub models: Vec<ConstmeModelStatus>,
+}
+
+#[derive(Serialize)]
+pub struct ConstmeModelStatus {
+    pub name: String,
+    pub filename: String,
+    pub size_description: String,
+    pub available: bool,
+    pub path: Option<String>,
+}
+
+#[tauri::command]
+pub fn get_constme_whisper_status() -> Result<ConstmeWhisperStatus, String> {
+    let dll_path = download::dll_path().map_err(|e| e.to_string())?;
+    let dll_available = dll_path.exists();
+
+    let models = download::AVAILABLE_MODELS
+        .iter()
+        .map(|m| {
+            let path = download::model_path(m.filename).ok();
+            let available = path.as_ref().map(|p| p.exists()).unwrap_or(false);
+            ConstmeModelStatus {
+                name: m.name.to_string(),
+                filename: m.filename.to_string(),
+                size_description: m.size_description.to_string(),
+                available,
+                path: if available {
+                    path.map(|p| p.to_string_lossy().to_string())
+                } else {
+                    None
+                },
+            }
+        })
+        .collect();
+
+    Ok(ConstmeWhisperStatus {
+        dll_available,
+        dll_path: if dll_available {
+            Some(dll_path.to_string_lossy().to_string())
+        } else {
+            None
+        },
+        models,
+    })
+}
+
+#[tauri::command]
+pub async fn download_constme_dll(app: AppHandle) -> Result<String, String> {
+    let path = download::download_dll(&app)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub async fn download_constme_model(
+    app: AppHandle,
+    model_filename: String,
+) -> Result<String, String> {
+    let path = download::download_model(&app, &model_filename)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
 }

@@ -1,6 +1,7 @@
 import type {
   AppSettings,
   AudioDevice,
+  ConstmeWhisperStatus,
   ProviderInfo,
   TranscriptionEntry,
 } from "../types";
@@ -20,6 +21,9 @@ const defaultSettings: AppSettings = {
   language: "auto",
   provider_configs: {},
   local_whisper_model_path: null,
+  constme_whisper_dll_path: null,
+  constme_whisper_model_path: null,
+  constme_whisper_model_name: null,
   auto_paste: true,
   show_overlay: true,
   input_device: null,
@@ -30,6 +34,7 @@ const defaultProviders: ProviderInfo[] = [
   { id: "GoogleCloud", name: "Google Cloud Speech-to-Text", available: true },
   { id: "LocalWhisper", name: "Local Whisper (whisper.cpp)", available: false },
   { id: "NativeStt", name: "Native OS Speech-to-Text", available: true },
+  { id: "ConstmeWhisper", name: "Whisper GPU (DirectCompute)", available: false },
 ];
 
 export async function startRecording(): Promise<void> {
@@ -66,4 +71,16 @@ export async function getProviders(): Promise<ProviderInfo[]> {
 
 export async function listInputDevices(): Promise<AudioDevice[]> {
   return tauriInvoke<AudioDevice[]>("list_input_devices").catch(() => []);
+}
+
+export async function getConstmeWhisperStatus(): Promise<ConstmeWhisperStatus> {
+  return tauriInvoke<ConstmeWhisperStatus>("get_constme_whisper_status");
+}
+
+export async function downloadConstmeDll(): Promise<string> {
+  return tauriInvoke<string>("download_constme_dll");
+}
+
+export async function downloadConstmeModel(modelFilename: string): Promise<string> {
+  return tauriInvoke<string>("download_constme_model", { modelFilename });
 }

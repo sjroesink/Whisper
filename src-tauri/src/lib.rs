@@ -89,6 +89,9 @@ pub fn run() {
             commands::clear_history,
             commands::get_providers,
             commands::list_input_devices,
+            commands::get_constme_whisper_status,
+            commands::download_constme_dll,
+            commands::download_constme_model,
         ])
         .run(tauri::generate_context!())
         .expect("error running whisper application");

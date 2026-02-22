@@ -1,3 +1,4 @@
+pub mod constme_whisper;
 pub mod google_cloud;
 pub mod local_whisper;
 pub mod native_stt;
@@ -15,6 +16,7 @@ pub enum ProviderId {
     GoogleCloud,
     LocalWhisper,
     NativeStt,
+    ConstmeWhisper,
 }
 
 impl std::fmt::Display for ProviderId {
@@ -24,6 +26,7 @@ impl std::fmt::Display for ProviderId {
             ProviderId::GoogleCloud => write!(f, "Google Cloud"),
             ProviderId::LocalWhisper => write!(f, "Local Whisper"),
             ProviderId::NativeStt => write!(f, "Native STT"),
+            ProviderId::ConstmeWhisper => write!(f, "Whisper GPU (DirectCompute)"),
         }
     }
 }
@@ -88,6 +91,10 @@ impl ProviderManager {
                 settings.local_whisper_model_path.as_deref(),
             )),
             std::sync::Arc::new(native_stt::NativeSttProvider),
+            std::sync::Arc::new(constme_whisper::ConstmeWhisperProvider::new(
+                settings.constme_whisper_dll_path.as_deref(),
+                settings.constme_whisper_model_path.as_deref(),
+            )),
         ];
 
         Self {

@@ -1,7 +1,195 @@
 import { useEffect, useState } from "react";
 import { useAppStore } from "../../stores/useAppStore";
-import { getProviders, listInputDevices, saveSettings } from "../../lib/commands";
-import type { AppSettings, AudioDevice, ProviderId } from "../../types";
+import {
+  getProviders,
+  listInputDevices,
+  saveSettings,
+  getConstmeWhisperStatus,
+  downloadConstmeDll,
+  downloadConstmeModel,
+} from "../../lib/commands";
+import type {
+  AppSettings,
+  AudioDevice,
+  ConstmeWhisperStatus,
+  ProviderId,
+} from "../../types";
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+function ConstmeWhisperSettings({
+  localSettings,
+  updateField,
+}: {
+  localSettings: AppSettings;
+  updateField: <K extends keyof AppSettings>(
+    key: K,
+    value: AppSettings[K]
+  ) => void;
+}) {
+  const [status, setStatus] = useState<ConstmeWhisperStatus | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadStatus();
+
+    // Listen for download progress events
+    let cleanup: (() => void) | undefined;
+    import("@tauri-apps/api/event").then(({ listen }) => {
+      listen<{
+        item: string;
+        downloaded_bytes: number;
+        total_bytes: number | null;
+        done: boolean;
+      }>("download-progress", (event) => {
+        const { item, downloaded_bytes, total_bytes, done } = event.payload;
+        if (done) {
+          setDownloadProgress("");
+          loadStatus();
+        } else {
+          const downloaded = formatBytes(downloaded_bytes);
+          const total = total_bytes ? formatBytes(total_bytes) : "?";
+          setDownloadProgress(`${item}: ${downloaded} / ${total}`);
+        }
+      }).then((unlisten) => {
+        cleanup = unlisten;
+      });
+    });
+
+    return () => cleanup?.();
+  }, []);
+
+  const loadStatus = () => {
+    getConstmeWhisperStatus()
+      .then(setStatus)
+      .catch(() => {});
+  };
+
+  const handleDownloadDll = async () => {
+    setDownloading("dll");
+    setError(null);
+    try {
+      const path = await downloadConstmeDll();
+      updateField("constme_whisper_dll_path", path);
+      loadStatus();
+    } catch (e) {
+      setError(`DLL download failed: ${e}`);
+    }
+    setDownloading(null);
+  };
+
+  const handleDownloadModel = async (filename: string) => {
+    setDownloading(filename);
+    setError(null);
+    try {
+      const path = await downloadConstmeModel(filename);
+      updateField("constme_whisper_model_path", path);
+      updateField("constme_whisper_model_name", filename);
+      loadStatus();
+    } catch (e) {
+      setError(`Model download failed: ${e}`);
+    }
+    setDownloading(null);
+  };
+
+  return (
+    <section className="flex flex-col gap-3">
+      <label className="text-sm font-medium text-zinc-400">
+        Whisper GPU Setup
+      </label>
+
+      {/* DLL Status */}
+      <div className="bg-zinc-800/50 rounded-lg p-3 flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-zinc-400">Whisper.dll</span>
+          {status?.dll_available ? (
+            <span className="text-xs text-green-400">Installed</span>
+          ) : (
+            <button
+              onClick={handleDownloadDll}
+              disabled={downloading !== null}
+              className="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 text-white rounded transition-colors"
+            >
+              {downloading === "dll" ? "Downloading..." : "Download"}
+            </button>
+          )}
+        </div>
+
+        {/* Model Selection */}
+        <div className="flex flex-col gap-1.5 mt-1">
+          <span className="text-xs text-zinc-400">Model</span>
+          {status?.models.map((model) => (
+            <div
+              key={model.filename}
+              className="flex items-center justify-between bg-zinc-900/50 rounded px-2 py-1.5"
+            >
+              <div className="flex flex-col">
+                <span className="text-xs text-zinc-300">{model.name}</span>
+                <span className="text-[10px] text-zinc-500">
+                  {model.size_description}
+                </span>
+              </div>
+              {model.available ? (
+                <button
+                  onClick={() => {
+                    if (model.path) {
+                      updateField("constme_whisper_model_path", model.path);
+                      updateField(
+                        "constme_whisper_model_name",
+                        model.filename
+                      );
+                    }
+                  }}
+                  className={`text-xs px-2 py-1 rounded transition-colors ${
+                    localSettings.constme_whisper_model_name === model.filename
+                      ? "bg-green-600/30 text-green-400 border border-green-600/50"
+                      : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
+                  }`}
+                >
+                  {localSettings.constme_whisper_model_name === model.filename
+                    ? "Selected"
+                    : "Select"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleDownloadModel(model.filename)}
+                  disabled={downloading !== null}
+                  className="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 text-white rounded transition-colors"
+                >
+                  {downloading === model.filename
+                    ? "Downloading..."
+                    : "Download"}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Download Progress */}
+      {downloadProgress && (
+        <p className="text-xs text-blue-400">{downloadProgress}</p>
+      )}
+
+      {/* Error */}
+      {error && <p className="text-xs text-red-400">{error}</p>}
+
+      <p className="text-xs text-zinc-500">
+        GPU-accelerated transcription using DirectCompute. Requires a Direct3D
+        11 compatible GPU. Medium model recommended for best balance of speed
+        and accuracy.
+      </p>
+    </section>
+  );
+}
 
 export function SettingsPanel() {
   const settings = useAppStore((s) => s.settings);
@@ -152,6 +340,14 @@ export function SettingsPanel() {
             Path to a whisper.cpp GGML model file (e.g. ggml-base.bin)
           </p>
         </section>
+      )}
+
+      {/* Const-me/Whisper GPU Settings */}
+      {localSettings.active_provider === "ConstmeWhisper" && (
+        <ConstmeWhisperSettings
+          localSettings={localSettings}
+          updateField={updateField}
+        />
       )}
 
       {/* Interaction Mode */}
